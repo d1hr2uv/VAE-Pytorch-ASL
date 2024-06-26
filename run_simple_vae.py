@@ -6,7 +6,7 @@ import numpy as np
 from tqdm import tqdm
 from einops import rearrange
 from torch.optim import Adam
-from dataset.mnist_loader import MnistDataset
+from dataset import ASLDataset  # Import the updated ASLDataset class
 from torch.utils.data import DataLoader
 
 
@@ -72,14 +72,13 @@ class VAEModel(nn.Module):
         out = self.decoder_fcs(z)
         out = out.reshape((z.size(0), 1, 28, 28))
         return out
-        
-        
+
 
 def train_vae():
     # Create the data set and the data loader
-    mnist = MnistDataset('train', im_path='data/train/images')
-    mnist_test = MnistDataset('test', im_path='data/test/images')
-    mnist_loader = DataLoader(mnist, batch_size=64, shuffle=True, num_workers=0)
+    asl_train = ASLDataset('train', im_path='/kaggle/input/asl-alphabet/asl_alphabet_train/asl_alphabet_train')
+    asl_test = ASLDataset('test', im_path='/kaggle/input/asl-alphabet/asl_alphabet_test/asl_alphabet_test')
+    asl_loader = DataLoader(asl_train, batch_size=64, shuffle=True, num_workers=0)
     
     # Instantiate the model
     model = VAEModel().to(device)
@@ -94,7 +93,7 @@ def train_vae():
     losses = []
     # Run training for 10 epochs
     for epoch_idx in range(num_epochs):
-        for im, label in tqdm(mnist_loader):
+        for im, label in tqdm(asl_loader):
             im = im.float().to(device)
             optimizer.zero_grad()
             mean, log_var, out = model(im)
@@ -102,7 +101,7 @@ def train_vae():
             cv2.imwrite('input.jpeg', 255*((im+1)/2).detach().cpu().numpy()[0, 0])
             cv2.imwrite('output.jpeg', 255 * ((out + 1) / 2).detach().cpu().numpy()[0, 0])
             
-            kl_loss = torch.mean(0.5* torch.sum(torch.exp(log_var) + mean**2 - 1 -log_var, dim=-1))
+            kl_loss = torch.mean(0.5 * torch.sum(torch.exp(log_var) + mean**2 - 1 - log_var, dim=-1))
             recon_loss = criterion(out, im)
             loss = recon_loss + 0.00001 * kl_loss
             recon_losses.append(recon_loss.item())
@@ -118,13 +117,13 @@ def train_vae():
         
     print('Done Training ...')
     # Run a reconstruction for some sample test images
-    idxs = torch.randint(0, len(mnist_test)-1, (100, ))
-    ims = torch.cat([mnist_test[idx][0][None, :] for idx in idxs]).float()
+    idxs = torch.randint(0, len(asl_test) - 1, (100,))
+    ims = torch.cat([asl_test[idx][0][None, :] for idx in idxs]).float()
     
     _, _, generated_im = model(ims)
     
-    ims = (ims + 1)/ 2
-    generated_im = 1- (generated_im + 1) / 2
+    ims = (ims + 1) / 2
+    generated_im = 1 - (generated_im + 1) / 2
     out = torch.hstack([ims, generated_im])
     output = rearrange(out, 'b c h w -> b () h (c w)')
     grid = torchvision.utils.make_grid(output, nrow=10)
