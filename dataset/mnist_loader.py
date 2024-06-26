@@ -39,10 +39,29 @@ class ASLDataset(Dataset):
         return im_tensor, torch.tensor(ord(label) - ord('A'))  # Convert label to a numerical value
 
 
+def get_data_loaders(train_path, test_path, batch_size=16, im_ext='jpg'):
+    train_dataset = ASLDataset('train', train_path, im_ext)
+    test_dataset = ASLDataset('test', test_path, im_ext)
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+
+    return train_loader, test_loader
+
+
 if __name__ == '__main__':
-    asl_dataset = ASLDataset('test', 'path_to_your_asl_dataset')
-    asl_loader = DataLoader(asl_dataset, batch_size=16, shuffle=True, num_workers=0)
-    for im, label in asl_loader:
+    train_path = '/kaggle/input/asl-alphabet/asl_alphabet_train/asl_alphabet_train'
+    test_path = '/kaggle/input/asl-alphabet/asl_alphabet_test/asl_alphabet_test'
+    train_loader, test_loader = get_data_loaders(train_path, test_path)
+
+    print("Training data:")
+    for im, label in train_loader:
+        print('Image dimension:', im.shape)
+        print('Label:', label)
+        break
+
+    print("\nTesting data:")
+    for im, label in test_loader:
         print('Image dimension:', im.shape)
         print('Label:', label)
         break
