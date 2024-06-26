@@ -8,24 +8,16 @@ from tqdm import tqdm
 import torchvision
 from model.vae import get_model
 from torch.utils.data.dataloader import DataLoader
-from dataset.mnist_loader import MnistDataset
 from torchvision.utils import make_grid
 from einops import rearrange
 import pickle
 from matplotlib import pyplot as plt
+from dataset import ASLDataset  # Import the updated ASLDataset class
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 def reconstruct(config, model, dataset, num_images=100):
-    r"""
-    Randomly sample points from the dataset and visualize image and its reconstruction
-    :param config: Config file used to create the model
-    :param model: Trained model
-    :param dataset: Mnist dataset(not the data loader)
-    :param num_images: NUmber of images to visualize
-    :return:
-    """
     print('Generating reconstructions')
     if not os.path.exists(config['train_params']['task_name']):
         os.mkdir(config['train_params']['task_name'])
@@ -55,14 +47,6 @@ def reconstruct(config, model, dataset, num_images=100):
 
 
 def visualize_latent_space(config, model, data_loader, save_fig_path):
-    r"""
-    Method to visualize the latent dimension by simply plotting the means for each of the images
-    :param config: Config file used to create the model
-    :param model:
-    :param data_loader:
-    :param save_fig_path: Path where the latent space image will be saved
-    :return:
-    """
     labels = []
     means = []
     
@@ -86,9 +70,9 @@ def visualize_latent_space(config, model, data_loader, save_fig_path):
         means = proj_means
     
     fig, ax = plt.subplots()
-    for num in range(10):
+    for num in range(26):  # Adjusted for 26 classes (A-Z)
         idxs = torch.where(labels == num)[0]
-        ax.scatter(means[idxs, 0].cpu().numpy(), means[idxs, 1].cpu().numpy(), s=10, label=str(num),
+        ax.scatter(means[idxs, 0].cpu().numpy(), means[idxs, 1].cpu().numpy(), s=10, label=str(chr(num + ord('A'))),
                    alpha=1.0, edgecolors='none')
     ax.legend()
     ax.grid(True)
@@ -96,19 +80,6 @@ def visualize_latent_space(config, model, data_loader, save_fig_path):
 
 
 def visualize_interpolation(config, model, dataset, interpolation_steps=500, save_dir='interp'):
-    r"""
-        We randomly fetch two points and linearly interpolate between them.
-        We only use the mean values for interpolation
-    :param config:
-    :param model:
-    :param dataset:
-    :param interpolation_steps: We will interpolate these many points between start and end
-    :param save_dir:
-    :return:
-    """
-    # if model.config['conditional']:
-    #     print('Interpolation is only for non conditional model. Check README for details. Skipping...')
-    #     return
     print('Interpolating between images')
     if not os.path.exists(config['train_params']['task_name']):
         os.mkdir(config['train_params']['task_name'])
@@ -128,7 +99,7 @@ def visualize_interpolation(config, model, dataset, interpolation_steps=500, sav
     
     idxs = torch.randint(0, len(dataset)-1, (2,))
     if model.config['conditional']:
-        label_val = torch.randint(0, 9, (1,))
+        label_val = torch.randint(0, 25, (1,))  # Adjusted for 26 classes (A-Z)
         labels = (torch.ones((1,)).long().to(device) * label_val).repeat((2))
     else:
         labels = None
@@ -138,7 +109,7 @@ def visualize_interpolation(config, model, dataset, interpolation_steps=500, sav
     means_start = means[0]
     means_end = means[1]
     if model.config['conditional']:
-        label_val = torch.randint(0, 9, (1,))
+        label_val = torch.randint(0, 25, (1,))  # Adjusted for 26 classes (A-Z)
         labels = (torch.ones((1,)).long().to(device) * label_val).repeat((interpolation_steps))
     else:
         labels = None
@@ -207,16 +178,35 @@ def inference(args):
     model.load_state_dict(torch.load(os.path.join(config['train_params']['task_name'],
                                                   config['train_params']['ckpt_name']), map_location='cpu'))
     model.eval()
-    mnist = MnistDataset('test', 'data/test/images')
-    mnist_loader = DataLoader(mnist, batch_size=config['train_params']['batch_size'], shuffle=True, num_workers=4)
+    asl_dataset = ASLDataset('test', '/kaggle/input/asl-alphabet/asl_alphabet_test/asl_alphabet_test/')
+    asl_loader = DataLoader(asl_dataset, batch_size=config['train_params']['batch_size'], shuffle=True, num_workers=4)
     
     with torch.no_grad():
         latent_im_path = os.path.join(config['train_params']['task_name'],
                                       config['train_params']['output_train_dir'],
                                       'latent_inference.jpeg')
-        visualize_latent_space(config, model, mnist_loader, latent_im_path)
-        visualize_interpolation(config, model, mnist)
-        reconstruct(config, model, mnist)
+        visualize_latent_space(config, model, asl_loader, latent_im_path)
+        visualize_interpolation(config, model, asl_dataset)
+        reconstruct(config, model, asl_dataset)
+        visualize_manifold(config, model)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Arguments for vae inference')
+    parser.add_argument('--config', dest='config_path',
+                        default='config/vae_kl.yaml', type=str)
+    args = parser.parse_args()
+    inference(args)
+
+    asl_loader = DataLoader(asl_dataset, batch_size=config['train_params']['batch_size'], shuffle=True, num_workers=4)
+    
+    with torch.no_grad():
+        latent_im_path = os.path.join(config['train_params']['task_name'],
+                                      config['train_params']['output_train_dir'],
+                                      'latent_inference.jpeg')
+        visualize_latent_space(config, model, asl_loader, latent_im_path)
+        visualize_interpolation(config, model, asl_dataset)
+        reconstruct(config, model, asl_dataset)
         visualize_manifold(config, model)
 
 
