@@ -47,21 +47,3 @@ def get_data_loaders(train_path, test_path, batch_size=16, im_ext='jpg'):
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
 
     return train_loader, test_loader
-
-
-if __name__ == '__main__':
-    train_path = '/kaggle/input/asl-alphabet/asl_alphabet_train/asl_alphabet_train'
-    test_path = '/kaggle/input/asl-alphabet/asl_alphabet_test/asl_alphabet_test'
-    train_loader, test_loader = get_data_loaders(train_path, test_path)
-
-    print("Training data:")
-    for im, label in train_loader:
-        print('Image dimension:', im.shape)
-        print('Label:', label)
-        break
-
-    print("\nTesting data:")
-    for im, label in test_loader:
-        print('Image dimension:', im.shape)
-        print('Label:', label)
-        break
