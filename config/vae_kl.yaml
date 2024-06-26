@@ -34,7 +34,7 @@ train_params:
   seed: 111
   save_training_image: True
 
-  train_path: 'data/train/images'
-  test_path: 'data/test/images'
+  train_path: '/kaggle/input/asl-alphabet/asl_alphabet_train/asl_alphabet_train'
+  test_path: '/kaggle/input/asl-alphabet/asl_alphabet_test/asl_alphabet_test'
   output_train_dir: 'output'
   save_latent_plot: True
