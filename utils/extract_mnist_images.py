@@ -1,31 +1,48 @@
-r"""
-File to extract csv images from csv files for mnist dataset.
-"""
-
 import os
 import cv2
+import glob
+import torch
 from tqdm import tqdm
-import numpy as np
-import _csv as csv
+from torch.utils.data.dataset import Dataset
+from torch.utils.data.dataloader import DataLoader
 
-def extract_images(save_dir, csv_fname):
-    assert os.path.exists(save_dir), "Directory {} to save images does not exist".format(save_dir)
-    assert os.path.exists(csv_fname), "Csv file {} does not exist".format(csv_fname)
-    with open(csv_fname) as f:
-        reader = csv.reader(f)
-        for idx, row in enumerate(reader):
-            if idx == 0:
-                continue
-            im = np.zeros((784))
-            im[:] = list(map(int, row[1:]))
-            im = im.reshape((28,28))
-            if not os.path.exists(os.path.join(save_dir, row[0])):
-                os.mkdir(os.path.join(save_dir, row[0]))
-            cv2.imwrite(os.path.join(save_dir, row[0], '{}.png'.format(idx)), im)
-            if idx % 1000 == 0:
-                print('Finished creating {} images in {}'.format(idx+1, save_dir))
-            
-            
-if __name__ == '__main__':
-    extract_images('data/train/images', '../data/mnist_train.csv')
-    extract_images('data/test/images', '../data/mnist_test.csv')
+class ASLDataset(Dataset):
+    def __init__(self, split, im_path, im_ext='jpg'):
+        self.split = split
+        self.im_ext = im_ext
+        self.images, self.labels = self.load_images(im_path)
+        
+    def load_images(self, im_path):
+        assert os.path.exists(im_path), "Images path {} does not exist".format(im_path)
+        ims = []
+        labels = []
+        for d_name in tqdm(os.listdir(im_path)):
+            dir_path = os.path.join(im_path, d_name)
+            if os.path.isdir(dir_path):
+                for fname in glob.glob(os.path.join(dir_path, '*.{}'.format(self.im_ext))):
+                    ims.append(fname)
+                    labels.append(d_name)  # Use directory name as label
+        print('Found {} images for split {}'.format(len(ims), self.split))
+        return ims, labels
+
+    def __len__(self):
+        return len(self.images)
+    
+    def __getitem__(self, index):
+        im = cv2.imread(self.images[index], cv2.IMREAD_GRAYSCALE)
+        label = self.labels[index]
+        # Convert to 0 to 255 into -1 to 1
+        im = 2 * (im / 255) - 1
+        # Convert H, W into 1, H, W
+        im_tensor = torch.from_numpy(im).unsqueeze(0)
+        return im_tensor, torch.tensor(ord(label) - ord('A'))  # Convert label to a numerical value
+
+
+def get_data_loaders(train_path, test_path, batch_size=16, im_ext='jpg'):
+    train_dataset = ASLDataset('train', train_path, im_ext)
+    test_dataset = ASLDataset('test', test_path, im_ext)
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+
+    return train_loader, test_loader
